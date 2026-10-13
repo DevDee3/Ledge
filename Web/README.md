@@ -38,6 +38,11 @@ The on-chain panel remains hidden until `NEXT_PUBLIC_LEDGE_REGISTRY` is configur
 
 Before enabling trading, deploy the Base market factory and collateral token, then verify the Base Sepolia registry and market addresses before enabling execution.
 
+The market loader and trading path verify that every market's `collateral()` address matches
+`NEXT_PUBLIC_LEDGE_COLLATERAL`. A mismatch is rejected before approvals or purchases are sent.
+The trading path also checks the wallet's collateral balance and approves only the maximum spend
+for each order, rather than approving the requested share amount.
+
 ## Local contract flow
 
 The contract lives in `../Contracts` and uses Foundry. Start Anvil, deploy with `script/DeployLocal.s.sol`, then configure the printed registry address and `NEXT_PUBLIC_CHAIN_ID=31337` before starting the web app.

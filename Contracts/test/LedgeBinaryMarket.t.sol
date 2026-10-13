@@ -53,4 +53,44 @@ contract LedgeBinaryMarketTest is Test {
         assertEq(market.balance(0, buyer), 0);
         assertEq(collateral.balanceOf(buyer), 10_005e6);
     }
+
+    function test_tradingAndLiquidityCloseAtExpiry() public {
+        vm.warp(block.timestamp + 1 days);
+
+        vm.expectRevert(LedgeBinaryMarket.MarketClosed.selector);
+        market.addLiquidity(1e6);
+
+        vm.expectRevert(LedgeBinaryMarket.MarketClosed.selector);
+        market.placeAsk(0, 500_000, 1e6);
+
+        vm.startPrank(buyer);
+        collateral.approve(address(market), 1e6);
+        vm.expectRevert(LedgeBinaryMarket.MarketClosed.selector);
+        market.buy(0, 500_000, 1e6);
+        vm.stopPrank();
+    }
+
+    function test_onlyOwnerCanUpdateReferencePrice() public {
+        vm.prank(buyer);
+        vm.expectRevert(LedgeBinaryMarket.NotOwner.selector);
+        market.setReferencePrice(65_000);
+    }
+
+    function test_ownerCanPauseAndUnpauseTrading() public {
+        market.pause();
+        assertTrue(market.paused());
+
+        vm.expectRevert(LedgeBinaryMarket.Paused.selector);
+        market.placeAsk(0, 500_000, 1e6);
+
+        market.unpause();
+        assertFalse(market.paused());
+        market.placeAsk(0, 500_000, 1e6);
+    }
+
+    function test_onlyOwnerCanPause() public {
+        vm.prank(buyer);
+        vm.expectRevert(LedgeBinaryMarket.NotOwner.selector);
+        market.pause();
+    }
 }

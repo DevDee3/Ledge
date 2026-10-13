@@ -1,5 +1,5 @@
 import { createPublicClient, http, parseAbi } from "viem";
-import { chain, RPC_URL } from "./chain";
+import { chain, COLLATERAL, RPC_URL } from "./chain";
 import type { Candidate } from "./hedge";
 
 const FACTORY = process.env.NEXT_PUBLIC_MARKET_FACTORY as `0x${string}` | undefined;
@@ -13,6 +13,7 @@ const factoryAbi = parseAbi([
   "function marketAt(uint256) view returns (address)",
 ]);
 const marketAbi = parseAbi([
+  "function collateral() view returns (address)",
   "function underlying() view returns (string)",
   "function strike() view returns (uint64)",
   "function expiry() view returns (uint64)",
@@ -56,7 +57,8 @@ export async function getBaseMarket(underlying: string): Promise<BaseMarketSnaps
   // dozens of simultaneous eth_call requests during a market refresh.
   for (let index = 0; index < addresses.length; index += 1) {
     const address = addresses[index];
-    const [name, strike, expiry, referencePrice, yesBook, noBook] = await Promise.all([
+    const [marketCollateral, name, strike, expiry, referencePrice, yesBook, noBook] = await Promise.all([
+      client.readContract({ address, abi: marketAbi, functionName: "collateral" }),
       client.readContract({ address, abi: marketAbi, functionName: "underlying" }),
       client.readContract({ address, abi: marketAbi, functionName: "strike" }),
       client.readContract({ address, abi: marketAbi, functionName: "expiry" }),
@@ -64,6 +66,7 @@ export async function getBaseMarket(underlying: string): Promise<BaseMarketSnaps
       client.readContract({ address, abi: marketAbi, functionName: "getBook", args: [0] }),
       client.readContract({ address, abi: marketAbi, functionName: "getBook", args: [1] }),
     ]);
+    if (COLLATERAL && marketCollateral.toLowerCase() !== COLLATERAL.toLowerCase()) continue;
     if (name !== underlying || Number(expiry) * 1000 <= now) continue;
     const toAsks = (book: readonly [readonly bigint[], readonly bigint[]]) => book[0].map((price, i) => ({ px: Number(price) / 1e6, sz: Number(book[1][i]) / 1e6 }));
     candidates.push({
@@ -77,7 +80,9 @@ export async function getBaseMarket(underlying: string): Promise<BaseMarketSnaps
     } satisfies BaseCandidate);
   }
 
-  if (candidates.length === 0) throw new Error(`No active Base binary markets found for ${underlying}.`);
+  if (candidates.length === 0) {
+    throw new Error(`No active Base binary markets found for ${underlying} using the configured collateral.`);
+  }
   return { underlying, markPx: candidates[0].markPx, assetIndex: ASSET_INDEX[underlying] ?? null, candidates, source: "live", fetchedAt: Date.now() };
 }
 

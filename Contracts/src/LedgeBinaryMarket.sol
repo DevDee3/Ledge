@@ -27,6 +27,7 @@ contract LedgeBinaryMarket {
     uint64 public immutable expiry;
     uint64 public referencePrice;
     bool public resolved;
+    bool public paused;
     uint8 public winningSide;
     uint256 public nextAskId;
     uint256 public yesCursor;
@@ -47,6 +48,11 @@ contract LedgeBinaryMarket {
     error AlreadyResolved();
     error NotResolved();
     error TransferFailed();
+    error MarketClosed();
+    error Reentrancy();
+    error Paused();
+
+    uint256 private _entered;
 
     event LiquidityAdded(address indexed provider, uint256 shares);
     event AskPlaced(uint256 indexed id, address indexed maker, uint8 side, uint256 price, uint256 shares);
@@ -55,6 +61,8 @@ contract LedgeBinaryMarket {
     event Resolved(uint8 winningSide);
     event Redeemed(address indexed trader, uint256 shares, uint256 payout);
     event ReferencePriceUpdated(uint256 price);
+    event PausedByOwner();
+    event UnpausedByOwner();
 
     constructor(address owner_, address collateral_, string memory underlying_, uint64 strike_, uint64 expiry_, uint64 referencePrice_) {
         if (owner_ == address(0) || collateral_ == address(0) || strike_ == 0 || expiry_ <= block.timestamp || referencePrice_ == 0) revert InvalidMarket();
@@ -66,7 +74,8 @@ contract LedgeBinaryMarket {
         referencePrice = referencePrice_;
     }
 
-    function addLiquidity(uint256 shares) external {
+    function addLiquidity(uint256 shares) external whenNotPaused nonReentrant {
+        _requireOpen();
         if (shares == 0) revert InvalidMarket();
         _pull(msg.sender, shares);
         balance[0][msg.sender] += shares;
@@ -76,12 +85,15 @@ contract LedgeBinaryMarket {
 
     function setReferencePrice(uint64 price) external {
         if (msg.sender != owner) revert NotOwner();
+        if (paused) revert Paused();
+        _requireOpen();
         if (price == 0) revert InvalidPrice();
         referencePrice = price;
         emit ReferencePriceUpdated(price);
     }
 
-    function placeAsk(uint8 side, uint64 price, uint128 shares) external returns (uint256 id) {
+    function placeAsk(uint8 side, uint64 price, uint128 shares) external whenNotPaused returns (uint256 id) {
+        _requireOpen();
         if (side > 1) revert InvalidSide();
         if (price == 0 || price >= ONE || shares == 0) revert InvalidPrice();
         if (balance[side][msg.sender] - locked[side][msg.sender] < shares) revert InsufficientShares();
@@ -100,7 +112,8 @@ contract LedgeBinaryMarket {
         emit AskCancelled(id, ask.remaining);
     }
 
-    function buy(uint8 side, uint64 maxPrice, uint128 shares) external returns (uint128 filled, uint256 cost) {
+    function buy(uint8 side, uint64 maxPrice, uint128 shares) external whenNotPaused nonReentrant returns (uint128 filled, uint256 cost) {
+        _requireOpen();
         if (side > 1 || maxPrice == 0 || shares == 0) revert InvalidPrice();
         uint256 cursor = side == 0 ? yesCursor : noCursor;
         uint256 left = shares;
@@ -136,7 +149,21 @@ contract LedgeBinaryMarket {
         emit Resolved(winner);
     }
 
-    function redeem(uint256 shares) external returns (uint256 payout) {
+    function pause() external {
+        if (msg.sender != owner) revert NotOwner();
+        if (paused) revert Paused();
+        paused = true;
+        emit PausedByOwner();
+    }
+
+    function unpause() external {
+        if (msg.sender != owner) revert NotOwner();
+        if (!paused) revert InvalidMarket();
+        paused = false;
+        emit UnpausedByOwner();
+    }
+
+    function redeem(uint256 shares) external nonReentrant returns (uint256 payout) {
         if (!resolved) revert NotResolved();
         if (shares == 0 || balance[winningSide][msg.sender] < shares) revert InsufficientShares();
         balance[winningSide][msg.sender] -= shares;
@@ -173,5 +200,21 @@ contract LedgeBinaryMarket {
 
     function _pay(address to, uint256 amount) internal {
         if (!ILedgeCollateral(collateral).transfer(to, amount)) revert TransferFailed();
+    }
+
+    modifier nonReentrant() {
+        if (_entered != 0) revert Reentrancy();
+        _entered = 1;
+        _;
+        _entered = 0;
+    }
+
+    modifier whenNotPaused() {
+        if (paused) revert Paused();
+        _;
+    }
+
+    function _requireOpen() internal view {
+        if (resolved || block.timestamp >= expiry) revert MarketClosed();
     }
 }

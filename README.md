@@ -60,6 +60,14 @@ LEDGE_DISABLE_DEMO=1
 
 Set `NEXT_PUBLIC_ENABLE_TRADING=1` only after verifying the deployed contracts, market books, oracle prices, and wallet flow.
 
+After starting the app, check the deployment health endpoint:
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+It verifies the Base chain, registry, oracle, market factory, collateral bytecode, registry-oracle match, market count, and BTC oracle price. Trading should remain disabled until this check is healthy.
+
 ## Deploy Base Sepolia contracts
 
 From `Contracts/`, configure `.env` without committing private keys:
@@ -128,6 +136,7 @@ Two confirmations per hedge leg are currently expected: one collateral approval 
 cd Web
 npm test
 npm run build
+npm run verify:deployment
 ```
 
 For contracts:

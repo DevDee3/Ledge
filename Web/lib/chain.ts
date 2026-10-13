@@ -10,6 +10,8 @@ const RAW_DEPLOY_BLOCK = (process.env.NEXT_PUBLIC_LEDGE_DEPLOY_BLOCK ?? "").trim
 const RAW_ENABLE_TRADING = process.env.NEXT_PUBLIC_ENABLE_TRADING;
 const RAW_EXPLORER = process.env.NEXT_PUBLIC_EXPLORER_URL;
 const RAW_ORACLE = process.env.NEXT_PUBLIC_LEDGE_ORACLE;
+const RAW_MARKET_FACTORY = process.env.NEXT_PUBLIC_MARKET_FACTORY;
+const RAW_COLLATERAL = process.env.NEXT_PUBLIC_LEDGE_COLLATERAL;
 
 const DEFAULT_RPC: Record<number, string> = {
   8453: "https://mainnet.base.org",
@@ -29,6 +31,8 @@ export const RPC_URL = RAW_RPC ?? DEFAULT_RPC[RAW_CHAIN_ID] ?? "";
 export const ENABLE_TRADING = RAW_ENABLE_TRADING === "1" && !IS_LOCAL;
 export const EXPLORER_URL = RAW_EXPLORER?.replace(/\/$/, "") ?? null;
 export const ORACLE: `0x${string}` | null = RAW_ORACLE && /^0x[0-9a-fA-F]{40}$/.test(RAW_ORACLE) ? RAW_ORACLE as `0x${string}` : null;
+export const MARKET_FACTORY: `0x${string}` | null = RAW_MARKET_FACTORY && /^0x[0-9a-fA-F]{40}$/.test(RAW_MARKET_FACTORY) ? RAW_MARKET_FACTORY as `0x${string}` : null;
+export const COLLATERAL: `0x${string}` | null = RAW_COLLATERAL && /^0x[0-9a-fA-F]{40}$/.test(RAW_COLLATERAL) ? RAW_COLLATERAL as `0x${string}` : null;
 
 if (![8453, 84532, 31337].includes(RAW_CHAIN_ID)) {
   throw new Error(`Unsupported chain "${process.env.NEXT_PUBLIC_CHAIN_ID ?? "84532"}". Set NEXT_PUBLIC_CHAIN_ID to base-sepolia, 84532, base, 8453, or 31337.`);
@@ -44,8 +48,8 @@ export const chain = defineChain({
 export const REGISTRY: `0x${string}` | null =
   RAW_REGISTRY && /^0x[0-9a-fA-F]{40}$/.test(RAW_REGISTRY) ? (RAW_REGISTRY as `0x${string}`) : null;
 
-if (ENABLE_TRADING && (!REGISTRY || (!IS_LOCAL && !ORACLE))) {
-  throw new Error("Trading requires NEXT_PUBLIC_LEDGE_REGISTRY and NEXT_PUBLIC_LEDGE_ORACLE to be configured.");
+if (ENABLE_TRADING && (!REGISTRY || (!IS_LOCAL && !ORACLE) || !MARKET_FACTORY || !COLLATERAL)) {
+  throw new Error("Trading requires the registry, oracle, market factory, and collateral addresses to be configured.");
 }
 
 /** First block to scan for Committed events. Set it to the deploy block to keep log queries small. */

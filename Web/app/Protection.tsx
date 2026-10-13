@@ -5,6 +5,8 @@ import {
   createPublicClient,
   createWalletClient,
   custom,
+  decodeAbiParameters,
+  encodeAbiParameters,
   http,
   parseEventLogs,
   type EIP1193Provider,
@@ -62,6 +64,9 @@ const publicClient = createPublicClient({
   chain,
   transport: http(RPC_URL, { retryCount: 3, retryDelay: 500, timeout: 15_000 }),
 });
+const registryConfigAbi = [
+  { type: "function", name: "oracle", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+] as const;
 
 const usd = (x: bigint) =>
   (Number(x) / 1e6).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
@@ -332,6 +337,24 @@ export default function Protection({ asset, isLong, notionalUsd, lossCapUsd, ass
     run("commit", async () => {
       if (!REGISTRY || !account) throw new Error("Connect a wallet first");
       const args = buildCommitArgs(input);
+      if (!ORACLE) throw new Error("The Base oracle address is not configured.");
+      const configuredOracle = await publicClient.readContract({
+        address: REGISTRY,
+        abi: registryConfigAbi,
+        functionName: "oracle",
+      });
+      if (configuredOracle.toLowerCase() !== ORACLE.toLowerCase()) {
+        throw new Error("The registry oracle does not match the configured Base oracle. Refusing to commit.");
+      }
+      const oracleCall = await publicClient.call({
+        to: ORACLE,
+        data: encodeAbiParameters([{ type: "uint32" }], [args[0]]),
+      });
+      if (!oracleCall.data || oracleCall.data.length !== 66) {
+        throw new Error("The Base oracle returned no usable price for this asset.");
+      }
+      const [oraclePrice] = decodeAbiParameters([{ type: "uint256" }], oracleCall.data);
+      if (oraclePrice === 0n) throw new Error("The Base oracle price is unset for this asset. Publish a price before committing.");
       const hash = await wallet().writeContract({
         address: REGISTRY,
         abi: ledgeRegistryAbi,

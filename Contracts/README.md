@@ -108,3 +108,12 @@ forge script script/DeployBaseMarket.s.sol:DeployBaseMarket --rpc-url base_sepol
 
 The script prints the collateral token and factory. Set those as `NEXT_PUBLIC_LEDGE_COLLATERAL`
 and `NEXT_PUBLIC_MARKET_FACTORY` in the web app.
+
+The factory owner is the configured `MARKET_OWNER`; only that owner can create markets. Market trading,
+liquidity additions, and reference-price updates close at expiry, and collateral-moving market functions
+use a reentrancy guard. Each market also has an owner-controlled emergency pause that blocks new
+liquidity, asks, and purchases while leaving resolution and redemption available. These controls are
+defense-in-depth and do not replace an independent audit.
+
+After changing the market contracts, redeploy the testnet factory and markets, then update the frontend
+addresses. Existing deployments do not receive source-code changes automatically.
