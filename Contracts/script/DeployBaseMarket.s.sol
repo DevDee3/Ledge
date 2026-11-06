@@ -17,7 +17,9 @@ contract DeployBaseMarket is Script {
         factory = new LedgeMarketFactory(marketOwner);
         collateral.faucet();
 
-        uint64 expiry = uint64(block.timestamp + 2 days);
+        uint256 durationDays = vm.envOr("MARKET_DURATION_DAYS", uint256(730));
+        require(durationDays > 0 && durationDays <= 730, "Invalid market duration");
+        uint64 expiry = uint64(block.timestamp + durationDays * 1 days);
         uint64 mark = 64_000;
         uint256 liquidity = 1_000e6;
         uint64[] memory strikes = new uint64[](6);

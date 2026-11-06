@@ -22,8 +22,8 @@ contract LedgeRegistry {
     /// @notice How long after expiry a plan can be settled before it can only be marked lapsed.
     uint64 public constant SETTLE_WINDOW = 10 minutes;
 
-    /// @notice Longest allowed commitment. Base testnet binary markets are short-dated.
-    uint64 public constant MAX_DURATION = 7 days;
+    /// @notice Longest allowed commitment. Supports one- and two-year markets.
+    uint64 public constant MAX_DURATION = 730 days;
 
     // ------------------------------------------------------------------ types
 

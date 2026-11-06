@@ -38,6 +38,7 @@ contract WideOracle {
 }
 
 contract LedgeRegistryTest is Test {
+    uint64 internal constant TEST_DURATION = 365 days;
     LedgeRegistry internal reg;
     MockOracle internal oracle;
 
@@ -81,7 +82,7 @@ contract LedgeRegistryTest is Test {
     // ------------------------------------------------------------ helpers
 
     function _commit(address who, bool isLong) internal returns (uint256 id, uint64 expiry) {
-        expiry = uint64(block.timestamp + 1 days);
+        expiry = uint64(block.timestamp + TEST_DURATION);
         vm.prank(who);
         id = reg.commit(BTC, isLong, NOTIONAL, CAP, expiry, LEGS);
     }
@@ -100,7 +101,7 @@ contract LedgeRegistryTest is Test {
     // ------------------------------------------------------------ commit
 
     function test_commit_readsEntryFromOracleAndEmits() public {
-        uint64 expiry = uint64(block.timestamp + 1 days);
+        uint64 expiry = uint64(block.timestamp + TEST_DURATION);
         vm.expectEmit(true, true, false, true);
         emit Committed(1, alice, BTC, true, ENTRY, NOTIONAL, CAP, expiry, LEGS);
         vm.prank(alice);
@@ -127,16 +128,16 @@ contract LedgeRegistryTest is Test {
 
     function test_commit_revertsOnZeroNotional() public {
         vm.expectRevert(LedgeRegistry.InvalidParams.selector);
-        reg.commit(BTC, true, 0, 0, uint64(block.timestamp + 1 days), LEGS);
+        reg.commit(BTC, true, 0, 0, uint64(block.timestamp + TEST_DURATION), LEGS);
     }
 
     function test_commit_revertsWhenCapExceedsNotional() public {
         vm.expectRevert(LedgeRegistry.InvalidParams.selector);
-        reg.commit(BTC, true, 100e6, 101e6, uint64(block.timestamp + 1 days), LEGS);
+        reg.commit(BTC, true, 100e6, 101e6, uint64(block.timestamp + TEST_DURATION), LEGS);
     }
 
     function test_commit_allowsCapEqualToNotional() public {
-        reg.commit(BTC, true, 100e6, 100e6, uint64(block.timestamp + 1 days), LEGS);
+        reg.commit(BTC, true, 100e6, 100e6, uint64(block.timestamp + TEST_DURATION), LEGS);
         assertEq(reg.planCount(), 1);
     }
 
@@ -158,32 +159,32 @@ contract LedgeRegistryTest is Test {
 
     function test_commit_revertsWhenOracleReturnsZero() public {
         vm.expectRevert(LedgeRegistry.OracleUnavailable.selector);
-        reg.commit(7, true, NOTIONAL, CAP, uint64(block.timestamp + 1 days), LEGS); // index 7 unset => 0
+        reg.commit(7, true, NOTIONAL, CAP, uint64(block.timestamp + TEST_DURATION), LEGS); // index 7 unset => 0
     }
 
     function test_commit_revertsWhenOracleReverts() public {
         oracle.setBroken(true);
         vm.expectRevert(LedgeRegistry.OracleUnavailable.selector);
-        reg.commit(BTC, true, NOTIONAL, CAP, uint64(block.timestamp + 1 days), LEGS);
+        reg.commit(BTC, true, NOTIONAL, CAP, uint64(block.timestamp + TEST_DURATION), LEGS);
     }
 
     function test_commit_revertsWhenOracleReturnIsNotAWord() public {
         oracle.setBadLength(true);
         vm.expectRevert(LedgeRegistry.OracleUnavailable.selector);
-        reg.commit(BTC, true, NOTIONAL, CAP, uint64(block.timestamp + 1 days), LEGS);
+        reg.commit(BTC, true, NOTIONAL, CAP, uint64(block.timestamp + TEST_DURATION), LEGS);
     }
 
     function test_commit_revertsWhenOraclePriceExceedsUint64() public {
         LedgeRegistry wide = new LedgeRegistry(address(new WideOracle()));
         vm.expectRevert(LedgeRegistry.OracleUnavailable.selector);
-        wide.commit(BTC, true, NOTIONAL, CAP, uint64(block.timestamp + 1 days), LEGS);
+        wide.commit(BTC, true, NOTIONAL, CAP, uint64(block.timestamp + TEST_DURATION), LEGS);
     }
 
     function test_commit_revertsWhenOracleIsNotAContract() public {
         // staticcall to an EOA succeeds with empty returndata, which must be rejected.
         LedgeRegistry eoa = new LedgeRegistry(makeAddr("not-a-contract"));
         vm.expectRevert(LedgeRegistry.OracleUnavailable.selector);
-        eoa.commit(BTC, true, NOTIONAL, CAP, uint64(block.timestamp + 1 days), LEGS);
+        eoa.commit(BTC, true, NOTIONAL, CAP, uint64(block.timestamp + TEST_DURATION), LEGS);
     }
 
     // ------------------------------------------------------------ settle: long
@@ -424,7 +425,7 @@ contract LedgeRegistryTest is Test {
 
     function test_works_withConfiguredOracleAdapter() public {
         LedgeRegistry prod = new LedgeRegistry(address(oracle));
-        uint64 expiry = uint64(block.timestamp + 1 days);
+        uint64 expiry = uint64(block.timestamp + TEST_DURATION);
         vm.prank(alice);
         uint256 id = prod.commit(BTC, true, NOTIONAL, CAP, expiry, LEGS);
         vm.warp(expiry);
@@ -456,7 +457,7 @@ contract LedgeRegistryTest is Test {
         uint128 cap = uint128(bound(capSeed, 0, notional));
         movePx = uint64(bound(movePx, 1, type(uint64).max));
 
-        uint64 expiry = uint64(block.timestamp + 1 days);
+        uint64 expiry = uint64(block.timestamp + TEST_DURATION);
         vm.prank(alice);
         uint256 id = reg.commit(BTC, isLong, notional, cap, expiry, LEGS);
 

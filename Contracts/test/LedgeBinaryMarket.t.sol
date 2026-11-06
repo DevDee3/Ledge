@@ -6,13 +6,14 @@ import {LedgeBinaryMarket} from "../src/LedgeBinaryMarket.sol";
 import {LedgeTestnetUSD} from "../src/LedgeTestnetUSD.sol";
 
 contract LedgeBinaryMarketTest is Test {
+    uint64 internal constant TEST_DURATION = 365 days;
     LedgeTestnetUSD internal collateral;
     LedgeBinaryMarket internal market;
     address internal buyer = address(0xB0B);
 
     function setUp() public {
         collateral = new LedgeTestnetUSD();
-        market = new LedgeBinaryMarket(address(this), address(collateral), "BTC", 62_000, uint64(block.timestamp + 1 days), 64_000);
+        market = new LedgeBinaryMarket(address(this), address(collateral), "BTC", 62_000, uint64(block.timestamp + TEST_DURATION), 64_000);
         collateral.faucet();
         collateral.approve(address(market), 1_000e6);
         market.addLiquidity(1_000e6);
@@ -45,7 +46,7 @@ contract LedgeBinaryMarketTest is Test {
         market.buy(0, 500_000, 10e6);
         vm.stopPrank();
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + TEST_DURATION);
         market.resolve(0);
         vm.prank(buyer);
         market.redeem(10e6);
@@ -55,7 +56,7 @@ contract LedgeBinaryMarketTest is Test {
     }
 
     function test_tradingAndLiquidityCloseAtExpiry() public {
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + TEST_DURATION);
 
         vm.expectRevert(LedgeBinaryMarket.MarketClosed.selector);
         market.addLiquidity(1e6);
